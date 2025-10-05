@@ -1,0 +1,16 @@
+vault:
+  id: "123456789012"  # Your secret vault resource ID
+
+secrets:
+  - name: production-db-password
+    dest: roles/database/files/db_password
+
+  - name: production-api-key
+    dest: roles/application/files/api_key
+
+  - name: production-tls-cert
+    dest: roles/webserver/files/server.crt
+    
+  - name: production-tls-key
+    dest: roles/webserver/files/server.key
+    version: 1  # Optional: specify a specific version (default: 0 = latest)
