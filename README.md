@@ -13,12 +13,6 @@ A command-line tool to pull secrets from Sakura Cloud Secret Manager and write t
 - Sakura Cloud account with Secret Manager enabled
 - API credentials (Access Token and Access Token Secret)
 
-## Installation
-
-```bash
-$ go install github.com/zinrai/sakura-secrets-pull@latest
-```
-
 ## Configuration
 
 ### Environment Variables
