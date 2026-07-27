@@ -6,17 +6,31 @@ import (
 	"os"
 )
 
+// Injected at build time by goreleaser via -ldflags -X
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	var (
-		configPath string
-		zone       string
-		dryRun     bool
+		configPath  string
+		dryRun      bool
+		showVersion bool
 	)
 
 	flag.StringVar(&configPath, "config", "", "Path to configuration file (required)")
-	flag.StringVar(&zone, "zone", "is1a", "Sakura Cloud zone (e.g., is1a, tk1a)")
 	flag.BoolVar(&dryRun, "dry-run", false, "Show what would be done without actually doing it")
+	flag.BoolVar(&showVersion, "version", false, "Print version")
 	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("sakura-secrets-pull version %s\n", version)
+		fmt.Printf("commit: %s\n", commit)
+		fmt.Printf("built: %s\n", date)
+		return
+	}
 
 	if configPath == "" {
 		fmt.Fprintln(os.Stderr, "Error: -config flag is required")
@@ -24,43 +38,35 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := run(configPath, zone, dryRun); err != nil {
+	if err := run(configPath, dryRun); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(configPath, zone string, dryRun bool) error {
-	// Load configuration
-	fmt.Printf("Loading configuration from %s...\n", configPath)
-
+func run(configPath string, dryRun bool) error {
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Configuration loaded: %d secret(s) to pull\n", len(cfg.Secrets))
-
-	// Create API client
-	client, err := NewClientFromEnv(zone)
+	client, err := NewClientFromEnv(cfg.Vault.Zone)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Using zone: %s\n", client.Zone)
-	fmt.Printf("Using vault: %s\n", cfg.Vault.ID)
-
-	// Fetch and write each secret
-	for i, secret := range cfg.Secrets {
-		fmt.Printf("[%d/%d] Pulling secret '%s'...\n", i+1, len(cfg.Secrets), secret.Name)
-
+	for _, secret := range cfg.Secrets {
 		value, err := client.GetSecret(cfg.Vault.ID, secret.Name, secret.Version)
 		if err != nil {
 			return fmt.Errorf("failed to pull secret '%s': %w", secret.Name, err)
 		}
 
 		if dryRun {
-			fmt.Printf("[OK] [DRY-RUN] Would write: %s -> %s\n", secret.Name, secret.Dest)
+			status, err := dryRunStatus(secret.Dest, value)
+			if err != nil {
+				return fmt.Errorf("failed to read %s: %w", secret.Dest, err)
+			}
+			fmt.Fprintf(os.Stderr, "[DRY-RUN] %s -> %s (%s)\n", secret.Name, secret.Dest, status)
 			continue
 		}
 
@@ -68,14 +74,29 @@ func run(configPath, zone string, dryRun bool) error {
 			return fmt.Errorf("failed to write secret '%s' to %s: %w", secret.Name, secret.Dest, err)
 		}
 
-		fmt.Printf("[OK] %s -> %s\n", secret.Name, secret.Dest)
+		fmt.Fprintf(os.Stderr, "[OK] %s -> %s\n", secret.Name, secret.Dest)
 	}
 
 	if dryRun {
-		fmt.Println("\nDry-run completed successfully (no files were written)")
+		fmt.Fprintf(os.Stderr, "dry-run: %d secret(s), no files written\n", len(cfg.Secrets))
 	} else {
-		fmt.Printf("\nSuccessfully pulled and wrote %d secret(s)\n", len(cfg.Secrets))
+		fmt.Fprintf(os.Stderr, "pulled %d secret(s)\n", len(cfg.Secrets))
 	}
 
 	return nil
+}
+
+// dryRunStatus reports what writing value to dest would do.
+func dryRunStatus(dest, value string) (string, error) {
+	current, err := os.ReadFile(dest)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "create", nil
+		}
+		return "", err
+	}
+	if string(current) == value {
+		return "unchanged", nil
+	}
+	return "update", nil
 }

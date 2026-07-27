@@ -1,116 +1,62 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"time"
+
+	"github.com/sacloud/saclient-go"
+	secretmanager "github.com/sacloud/secretmanager-api-go"
+	v1 "github.com/sacloud/secretmanager-api-go/apis/v1"
 )
 
-// SakuraClient represents the Sakura Cloud API client
+// SakuraClient represents the Sakura Cloud Secret Manager API client
 type SakuraClient struct {
-	Token       string
-	TokenSecret string
-	Zone        string
-	HTTPClient  *http.Client
+	Zone string
+	api  *v1.Client
 }
 
-// UnveilRequest represents the request body for the unveil API
-type UnveilRequest struct {
-	Secret SecretRequest `json:"Secret"`
-}
-
-// SecretRequest represents the secret request parameters
-type SecretRequest struct {
-	Name    string `json:"Name"`
-	Version int    `json:"Version"`
-}
-
-// UnveilResponse represents the response from the unveil API
-type UnveilResponse struct {
-	Secret SecretResponse `json:"Secret"`
-}
-
-// SecretResponse represents the secret response data
-type SecretResponse struct {
-	Name    string `json:"Name"`
-	Version int    `json:"Version"`
-	Value   string `json:"Value"`
-}
-
-// NewClientFromEnv creates a new SakuraClient from environment variables
+// NewClientFromEnv creates a new SakuraClient for the specified zone.
+// Credentials are resolved by saclient-go from environment variables,
+// supporting both static API keys and service principals.
 func NewClientFromEnv(zone string) (*SakuraClient, error) {
-	token := os.Getenv("SAKURACLOUD_ACCESS_TOKEN")
-	tokenSecret := os.Getenv("SAKURACLOUD_ACCESS_TOKEN_SECRET")
+	endpoint := fmt.Sprintf("SAKURA_ENDPOINTS_SECRETMANAGER=https://secure.sakura.ad.jp/cloud/zone/%s/api/cloud/1.1", zone)
 
-	if token == "" {
-		return nil, fmt.Errorf("SAKURACLOUD_ACCESS_TOKEN is not set")
+	var sc saclient.Client
+	if err := sc.SetEnviron(append(os.Environ(), endpoint)); err != nil {
+		return nil, fmt.Errorf("failed to configure saclient: %w", err)
 	}
-	if tokenSecret == "" {
-		return nil, fmt.Errorf("SAKURACLOUD_ACCESS_TOKEN_SECRET is not set")
+	if err := sc.Populate(); err != nil {
+		return nil, fmt.Errorf("failed to configure saclient: %w", err)
+	}
+
+	api, err := secretmanager.NewClient(&sc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Secret Manager client: %w", err)
 	}
 
 	return &SakuraClient{
-		Token:       token,
-		TokenSecret: tokenSecret,
-		Zone:        zone,
-		HTTPClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
+		Zone: zone,
+		api:  api,
 	}, nil
 }
 
-// GetSecret retrieves a secret from the specified vault
+// GetSecret retrieves a secret from the specified vault using the unveil API.
+// version 0 means the latest version.
 func (c *SakuraClient) GetSecret(vaultID, secretName string, version int) (string, error) {
-	url := fmt.Sprintf(
-		"https://secure.sakura.ad.jp/cloud/zone/%s/api/cloud/1.1/secretmanager/vaults/%s/secrets/unveil",
-		c.Zone,
-		vaultID,
-	)
+	op := secretmanager.NewSecretOp(c.api, vaultID)
 
-	reqBody := UnveilRequest{
-		Secret: SecretRequest{
-			Name:    secretName,
-			Version: version,
-		},
+	req := v1.Unveil{
+		Name: secretName,
+	}
+	if version != 0 {
+		req.Version = v1.NewOptNilInt(version)
 	}
 
-	jsonData, err := json.Marshal(reqBody)
+	res, err := op.Unveil(context.Background(), req)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.SetBasicAuth(c.Token, c.TokenSecret)
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var unveilResp UnveilResponse
-	if err := json.Unmarshal(body, &unveilResp); err != nil {
-		return "", fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	return unveilResp.Secret.Value, nil
+	return res.Value, nil
 }

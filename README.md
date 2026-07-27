@@ -11,15 +11,25 @@ A command-line tool to pull secrets from Sakura Cloud Secret Manager and write t
 ## Prerequisites
 
 - Sakura Cloud account with Secret Manager enabled
-- API credentials (Access Token and Access Token Secret)
+- API credentials (static API keys or a service principal)
 
 ## Configuration
 
 ### Environment Variables
 
+API credentials are resolved by [saclient-go](https://github.com/sacloud/saclient-go). Set either static API keys:
+
 ```bash
-$ export SAKURACLOUD_ACCESS_TOKEN="your-access-token"
-$ export SAKURACLOUD_ACCESS_TOKEN_SECRET="your-access-token-secret"
+$ export SAKURA_ACCESS_TOKEN="your-access-token"
+$ export SAKURA_ACCESS_TOKEN_SECRET="your-access-token-secret"
+```
+
+or service principal credentials:
+
+```bash
+$ export SAKURA_SERVICE_PRINCIPAL_ID="your-service-principal-id"
+$ export SAKURA_SERVICE_PRINCIPAL_KEY_ID="your-key-id"
+$ export SAKURA_PRIVATE_KEY_PATH="/path/to/private-key.pem"
 ```
 
 ### Configuration File
@@ -29,6 +39,7 @@ Create a YAML configuration file (e.g., `secrets-config.yaml`):
 ```yaml
 vault:
   id: "123456789012"  # Your vault resource ID
+  zone: is1a          # Optional (default: is1a)
 
 secrets:
   - name: production-db-password
@@ -48,11 +59,21 @@ $ sakura-secrets-pull -config secrets-config.yaml
 
 ### Dry-run Mode
 
-Test what would be done without actually writing files:
+Report what would be done without writing files. Each entry is compared with the current content of its destination file:
 
 ```bash
 $ sakura-secrets-pull -config secrets-config.yaml -dry-run
+[DRY-RUN] production-db-password -> roles/database/files/db_password (unchanged)
+[DRY-RUN] production-api-key -> roles/application/files/api_key (update)
+[DRY-RUN] new-secret -> roles/app/files/new_secret (create)
+dry-run: 3 secret(s), no files written
 ```
+
+- `unchanged`: the destination file already matches the value in Secret Manager
+- `update`: the destination file exists but its content differs
+- `create`: the destination file does not exist
+
+Secret values are never printed.
 
 ### Use Cases
 
@@ -80,8 +101,10 @@ sakura-secrets-pull -config secrets-production.yaml
 ## Command-line Options
 
 - `-config <path>`: Path to configuration file (required)
-- `-zone <zone>`: Sakura Cloud zone (default: is1a)
 - `-dry-run`: Show what would be done without actually writing files
+- `-version`: Print version
+
+The vault to pull from, including its zone, is fully described by the configuration file. Progress is reported on stderr, one line per written file.
 
 ## Error Handling
 

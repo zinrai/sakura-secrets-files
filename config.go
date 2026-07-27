@@ -15,7 +15,8 @@ type Config struct {
 
 // VaultConfig represents the vault configuration
 type VaultConfig struct {
-	ID string `yaml:"id"`
+	ID   string `yaml:"id"`
+	Zone string `yaml:"zone"`
 }
 
 // SecretConfig represents a single secret configuration
@@ -35,6 +36,10 @@ func LoadConfig(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	if cfg.Vault.Zone == "" {
+		cfg.Vault.Zone = "is1a"
 	}
 
 	if err := cfg.Validate(); err != nil {
