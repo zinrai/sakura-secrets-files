@@ -1,23 +1,26 @@
-# sakura-secrets-pull
+# sakura-secrets-files
 
-A command-line tool to pull secrets from Sakura Cloud Secret Manager and write them to local files.
+A command-line tool that makes secrets from [SAKURA Cloud Secret Manager](https://cloud.sakura.ad.jp/products/secrets-manager/) present or absent at declared file paths.
 
 ## Features
 
-- Pulls secrets from Sakura Cloud Secret Manager via API
-- Writes secrets to specified file paths atomically
-- Dry-run mode for testing
+- A YAML manifest declares which secret goes to which path
+- `present` compares each secret against the current file content and reports the decision per file: `create`, `update` or `unchanged`. Files are written atomically with 0600 permissions, and only when the content differs
+- `absent` removes the declared paths, so a wrapper can bound the lifetime of materialized secrets to a single operation
+- `absent` needs no credentials and no network. Removing files is a purely local operation
+- `-dry-run` reports the same decisions without changing anything
+- Fail-fast with no retry logic. Errors exit immediately with a detailed message
 
-## Prerequisites
+## Requirements
 
-- Sakura Cloud account with Secret Manager enabled
-- API credentials (static API keys or a service principal)
+- SAKURA Cloud account with Secret Manager access
+- Valid API credentials (static API keys or a service principal)
 
 ## Configuration
 
 ### Environment Variables
 
-API credentials are resolved by [saclient-go](https://github.com/sacloud/saclient-go). Set either static API keys:
+API credentials are resolved by [sacloud-sdk-go](https://github.com/sacloud/sacloud-sdk-go). Set either static API keys:
 
 ```bash
 $ export SAKURA_ACCESS_TOKEN="your-access-token"
@@ -34,7 +37,7 @@ $ export SAKURA_PRIVATE_KEY_PATH="/path/to/private-key.pem"
 
 ### Configuration File
 
-Create a YAML configuration file (e.g., `secrets-config.yaml`):
+Create a YAML manifest (e.g., `secrets.yaml`):
 
 ```yaml
 vault:
@@ -51,68 +54,34 @@ secrets:
 
 ## Usage
 
-### Basic Usage
+Write the declared secrets to their paths:
 
 ```bash
-$ sakura-secrets-pull -config secrets-config.yaml
+$ sakura-secrets-files present -config secrets.yaml
+[create] production-db-password -> roles/database/files/db_password
+[update] production-api-key -> roles/application/files/api_key
 ```
 
-### Dry-run Mode
-
-Report what would be done without writing files. Each entry is compared with the current content of its destination file:
+Remove them:
 
 ```bash
-$ sakura-secrets-pull -config secrets-config.yaml -dry-run
-[DRY-RUN] production-db-password -> roles/database/files/db_password (unchanged)
-[DRY-RUN] production-api-key -> roles/application/files/api_key (update)
-[DRY-RUN] new-secret -> roles/app/files/new_secret (create)
-dry-run: 3 secret(s), no files written
+$ sakura-secrets-files absent -config secrets.yaml
+[removed] roles/database/files/db_password
+[removed] roles/application/files/api_key
 ```
 
-- `unchanged`: the destination file already matches the value in Secret Manager
-- `update`: the destination file exists but its content differs
-- `create`: the destination file does not exist
+### Options
 
-Secret values are never printed.
+Both subcommands take:
 
-### Use Cases
-
-This tool is useful for:
-
-- Deployment automation scripts that need to fetch secrets before deployment
-- CI/CD pipelines that manage secrets separately from code
-- Configuration management workflows where secrets are stored centrally
-- Local development environments that pull production-like secrets
-
-Example deployment script:
-
-```bash
-#!/bin/bash
-set -e
-
-# Pull secrets from Secret Manager
-sakura-secrets-pull -config secrets-production.yaml
-
-# Use the pulled secrets in your deployment
-# (e.g., configuration management tools, custom scripts, etc.)
-./deploy.sh
-```
-
-## Command-line Options
-
-- `-config <path>`: Path to configuration file (required)
-- `-dry-run`: Show what would be done without actually writing files
-- `-version`: Print version
-
-The vault to pull from, including its zone, is fully described by the configuration file. Progress is reported on stderr, one line per written file.
+- `-config <path>`: Path to the manifest (required)
+- `-dry-run`: Report decisions without changing anything
 
 ## Error Handling
 
-The tool follows a fail-fast approach:
-
-- If any secret fails to pull, the tool exits immediately with exit code 1
-- No retry logic - re-run the command if it fails
-- Errors include detailed messages about which operation failed
+- If any secret fails to fetch or write, the tool exits immediately with exit code 1
+- `absent` treats an already missing path as success and reports it as `[absent]`
+- No retry logic. Re-run the command if it fails
 
 ## Security
 

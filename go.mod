@@ -1,4 +1,4 @@
-module github.com/zinrai/sakura-secrets-pull
+module github.com/zinrai/sakura-secrets-files
 
 go 1.25.5
 
