@@ -6,22 +6,20 @@ import (
 	"path/filepath"
 )
 
-// WriteSecretToFile writes the secret value to the specified file atomically
 func WriteSecretToFile(dest, value string) error {
-	// Create parent directories if they don't exist
 	dir := filepath.Dir(dest)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Create a temporary file in the same directory
+	// Not in TMPDIR: the rename has to stay on one filesystem, and the value
+	// must never land outside the directory the caller prepared for it
 	tmpFile, err := os.CreateTemp(dir, ".secret-*.tmp")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
 
-	// Ensure cleanup on error
 	defer func() {
 		if tmpFile != nil {
 			tmpFile.Close()
@@ -29,29 +27,26 @@ func WriteSecretToFile(dest, value string) error {
 		}
 	}()
 
-	// Write the secret value
 	if _, err := tmpFile.WriteString(value); err != nil {
 		return fmt.Errorf("failed to write to temp file: %w", err)
 	}
 
-	// Ensure data is written to disk
 	if err := tmpFile.Sync(); err != nil {
 		return fmt.Errorf("failed to sync temp file: %w", err)
 	}
 
-	// Close the temp file
 	if err := tmpFile.Close(); err != nil {
 		return fmt.Errorf("failed to close temp file: %w", err)
 	}
-	tmpFile = nil // Prevent cleanup in defer
+	tmpFile = nil
 
-	// Set permissions to 0600 (read/write for owner only)
+	// Before the rename, not after: dest must never be readable by anyone but
+	// the owner, not even for the moment between the two calls
 	if err := os.Chmod(tmpPath, 0600); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("failed to set permissions: %w", err)
 	}
 
-	// Atomically rename temp file to destination
 	if err := os.Rename(tmpPath, dest); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("failed to rename temp file: %w", err)

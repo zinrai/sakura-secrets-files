@@ -1,44 +1,53 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
+	flag.Usage = printUsage
+
+	configPath := flag.String("config", "", "Path to the manifest (required)")
+	baseDir := flag.String("base-dir", "", "Directory the dest paths are resolved against (required)")
+	showVersion := flag.Bool("version", false, "Print version and exit")
+
+	flag.Parse()
+
+	if *showVersion {
+		printVersion()
+		return
 	}
 
-	var err error
-	switch os.Args[1] {
-	case "present":
-		err = runPresent(os.Args[2:])
-	case "absent":
-		err = runAbsent(os.Args[2:])
-	case "version":
-		runVersion()
-	default:
-		fmt.Fprintf(os.Stderr, "Unknown subcommand: %s\n", os.Args[1])
-		printUsage()
-		os.Exit(1)
+	if *configPath == "" {
+		flag.Usage()
+		fail(fmt.Errorf("-config is required"))
+	}
+	// No default and no cwd fallback: without a directory chosen for this run,
+	// a mistaken invocation writes plaintext wherever it happens to be standing
+	if *baseDir == "" {
+		flag.Usage()
+		fail(fmt.Errorf("-base-dir is required"))
 	}
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	if err := run(*configPath, *baseDir); err != nil {
+		fail(err)
 	}
 }
 
+func fail(err error) {
+	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	os.Exit(1)
+}
+
 func printUsage() {
-	fmt.Fprintf(os.Stderr, `Usage: sakura-secrets-files <subcommand> [options]
+	fmt.Fprintf(os.Stderr, `Usage: sakura-secrets-files -config <path> -base-dir <dir>
 
-Subcommands:
-  present  Write the declared secrets to their destination paths
-  absent   Remove the declared destination paths
-  version  Print version
+Writes the secrets declared in the manifest to their dest paths under base-dir.
+The lifetime of the written files is the caller's responsibility.
 
-Use "sakura-secrets-files <subcommand> -h" for more information about a subcommand.
+Options:
 `)
+	flag.PrintDefaults()
 }

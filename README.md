@@ -1,26 +1,34 @@
 # sakura-secrets-files
 
-A command-line tool that makes secrets from [SAKURA Cloud Secret Manager](https://cloud.sakura.ad.jp/products/secrets-manager/) present or absent at declared file paths.
+A command-line tool that materializes secrets from [SAKURA Cloud Secret Manager](https://cloud.sakura.ad.jp/products/secrets-manager/) as files below a given directory, as declared in a YAML manifest.
 
-## Features
+## Usage
 
-- A YAML manifest declares which secret goes to which path
-- `present` compares each secret against the current file content and reports the decision per file: `create`, `update` or `unchanged`. Files are written atomically with 0600 permissions, and only when the content differs
-- `absent` removes the declared paths, so a wrapper can bound the lifetime of materialized secrets to a single operation
-- `absent` needs no credentials and no network. Removing files is a purely local operation
-- `-dry-run` reports the same decisions without changing anything
-- Fail-fast with no retry logic. Errors exit immediately with a detailed message
+```bash
+$ sakura-secrets-files -config secrets.yaml -base-dir /tmp/tmp.abc123
+[write] production-db-password -> /tmp/tmp.abc123/database/db_password
+[write] production-api-key -> /tmp/tmp.abc123/application/api_key
+```
 
-## Requirements
+One line per file on stderr. Every secret in the manifest is fetched and written on every run.
 
-- SAKURA Cloud account with Secret Manager access
-- Valid API credentials (static API keys or a service principal)
+### Options
 
-## Configuration
+| Option | Required | Description |
+|--------|----------|-------------|
+| `-config <path>` | yes | Path to the manifest |
+| `-base-dir <dir>` | yes | Directory the `dest` paths are resolved against. It must already exist |
+| `-version` | no | Print version and exit |
 
-### Environment Variables
+## Manifest
 
-API credentials are resolved by [sacloud-sdk-go](https://github.com/sacloud/sacloud-sdk-go). Set either static API keys:
+See [config.yaml.example](./config.yaml.example) for one to copy.
+
+`dest` is a path relative to `-base-dir`. An absolute path, a path that escapes `-base-dir`, and an unknown key anywhere in the manifest are all errors. The latest version of each secret is fetched.
+
+## Credentials
+
+Resolved by [sacloud-sdk-go](https://github.com/sacloud/sacloud-sdk-go) from the environment, and never logged or written to disk. Set either static API keys:
 
 ```bash
 $ export SAKURA_ACCESS_TOKEN="your-access-token"
@@ -35,59 +43,17 @@ $ export SAKURA_SERVICE_PRINCIPAL_KEY_ID="your-key-id"
 $ export SAKURA_PRIVATE_KEY_PATH="/path/to/private-key.pem"
 ```
 
-### Configuration File
+## What it writes
 
-Create a YAML manifest (e.g., `secrets.yaml`):
+- Files with 0600 permissions, into missing intermediate directories created with 0700
+- Atomically, through a temporary file in the destination directory
+- Nothing outside `-base-dir`. The check is lexical, so it assumes `-base-dir` is a directory you control, and not one another user can plant symlinks in
+- Nothing at all until the manifest, every `dest` and `-base-dir` have been checked, so a bad manifest fails without a single secret leaving the vault
 
-```yaml
-vault:
-  id: "123456789012"  # Your vault resource ID
-  zone: is1a          # Optional (default: is1a)
+## When it fails
 
-secrets:
-  - name: production-db-password
-    dest: roles/database/files/db_password
-
-  - name: production-api-key
-    dest: roles/application/files/api_key
-```
-
-## Usage
-
-Write the declared secrets to their paths:
-
-```bash
-$ sakura-secrets-files present -config secrets.yaml
-[create] production-db-password -> roles/database/files/db_password
-[update] production-api-key -> roles/application/files/api_key
-```
-
-Remove them:
-
-```bash
-$ sakura-secrets-files absent -config secrets.yaml
-[removed] roles/database/files/db_password
-[removed] roles/application/files/api_key
-```
-
-### Options
-
-Both subcommands take:
-
-- `-config <path>`: Path to the manifest (required)
-- `-dry-run`: Report decisions without changing anything
-
-## Error Handling
-
-- If any secret fails to fetch or write, the tool exits immediately with exit code 1
-- `absent` treats an already missing path as success and reports it as `[absent]`
-- No retry logic. Re-run the command if it fails
-
-## Security
-
-- Secrets are written with 0600 permissions (owner read/write only)
-- Atomic writes using temporary files ensure no partial writes
-- API credentials are never logged or written to disk
+- Exit code 1 on the first failure, with no retry
+- Secrets written before the failure are left in place. Removing them is the caller's business
 
 ## License
 
