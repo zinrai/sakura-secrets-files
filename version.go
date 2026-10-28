@@ -2,8 +2,6 @@ package main
 
 import "fmt"
 
-// Overwritten by goreleaser via -ldflags -X, so the defaults are what a
-// locally built binary reports
 var (
 	version = "dev"
 	commit  = "none"
