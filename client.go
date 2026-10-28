@@ -10,13 +10,13 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
 
-type SakuraClient struct {
+type sakuraClient struct {
 	api *v1.Client
 }
 
 // Credentials are left to saclient rather than read here, so that API keys and
 // service principals keep resolving the way the SDK documents them
-func NewClientFromEnv(zone string) (*SakuraClient, error) {
+func newClientFromEnv(zone string) (*sakuraClient, error) {
 	endpoint := fmt.Sprintf("SAKURA_ENDPOINTS_SECRETMANAGER=https://secure.sakura.ad.jp/cloud/zone/%s/api/cloud/1.1", zone)
 
 	var sc saclient.Client
@@ -32,10 +32,10 @@ func NewClientFromEnv(zone string) (*SakuraClient, error) {
 		return nil, fmt.Errorf("failed to create Secret Manager client: %w", err)
 	}
 
-	return &SakuraClient{api: api}, nil
+	return &sakuraClient{api: api}, nil
 }
 
-func (c *SakuraClient) GetSecret(vaultID, secretName string) (string, error) {
+func (c *sakuraClient) getSecret(vaultID, secretName string) (string, error) {
 	op := secretmanager.NewSecretOp(c.api, vaultID)
 
 	req := secretmanager.UnveilParams{

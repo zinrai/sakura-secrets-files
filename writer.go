@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-func WriteSecretToFile(dest, value string) error {
+func writeSecretToFile(dest, value string) error {
 	dir := filepath.Dir(dest)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)

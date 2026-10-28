@@ -9,22 +9,22 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-type Config struct {
-	Vault   VaultConfig    `yaml:"vault"`
-	Secrets []SecretConfig `yaml:"secrets"`
+type config struct {
+	Vault   vaultConfig    `yaml:"vault"`
+	Secrets []secretConfig `yaml:"secrets"`
 }
 
-type VaultConfig struct {
+type vaultConfig struct {
 	ID   string `yaml:"id"`
 	Zone string `yaml:"zone"`
 }
 
-type SecretConfig struct {
+type secretConfig struct {
 	Name string `yaml:"name"`
 	Dest string `yaml:"dest"`
 }
 
-func LoadConfig(path string) (*Config, error) {
+func loadConfig(path string) (*config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -32,7 +32,7 @@ func LoadConfig(path string) (*Config, error) {
 
 	// Strict, so that a key this tool has stopped honoring fails loudly rather
 	// than leaving the caller with a setting that no longer does anything
-	var cfg Config
+	var cfg config
 	if err := yaml.UnmarshalWithOptions(data, &cfg, yaml.Strict()); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
@@ -41,14 +41,14 @@ func LoadConfig(path string) (*Config, error) {
 		cfg.Vault.Zone = "is1a"
 	}
 
-	if err := cfg.Validate(); err != nil {
+	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
 	return &cfg, nil
 }
 
-func (c *Config) Validate() error {
+func (c *config) validate() error {
 	if c.Vault.ID == "" {
 		return fmt.Errorf("vault.id is required")
 	}

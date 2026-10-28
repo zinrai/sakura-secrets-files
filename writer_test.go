@@ -9,8 +9,8 @@ import (
 func TestWriteSecretToFileWritesTheValueOwnerOnly(t *testing.T) {
 	dest := filepath.Join(t.TempDir(), "database", "db_password")
 
-	if err := WriteSecretToFile(dest, "s3cret"); err != nil {
-		t.Fatalf("WriteSecretToFile() error = %v", err)
+	if err := writeSecretToFile(dest, "s3cret"); err != nil {
+		t.Fatalf("writeSecretToFile() error = %v", err)
 	}
 
 	content, err := os.ReadFile(dest)
@@ -44,8 +44,8 @@ func TestWriteSecretToFileNarrowsAWiderExistingFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := WriteSecretToFile(dest, "s3cret"); err != nil {
-		t.Fatalf("WriteSecretToFile() error = %v", err)
+	if err := writeSecretToFile(dest, "s3cret"); err != nil {
+		t.Fatalf("writeSecretToFile() error = %v", err)
 	}
 
 	info, err := os.Stat(dest)

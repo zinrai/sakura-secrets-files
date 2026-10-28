@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestPlanSecretsRejectsTwoSecretsWritingToOneDest(t *testing.T) {
-	secrets := []SecretConfig{
+	secrets := []secretConfig{
 		{Name: "first", Dest: "database/db_password"},
 		{Name: "second", Dest: "database/./db_password"},
 	}

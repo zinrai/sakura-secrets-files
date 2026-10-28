@@ -16,7 +16,7 @@ func run(configPath, baseDir string) error {
 		return err
 	}
 
-	cfg, err := LoadConfig(configPath)
+	cfg, err := loadConfig(configPath)
 	if err != nil {
 		return err
 	}
@@ -28,7 +28,7 @@ func run(configPath, baseDir string) error {
 		return err
 	}
 
-	client, err := NewClientFromEnv(cfg.Vault.Zone)
+	client, err := newClientFromEnv(cfg.Vault.Zone)
 	if err != nil {
 		return err
 	}
@@ -36,7 +36,7 @@ func run(configPath, baseDir string) error {
 	return materialize(client, cfg.Vault.ID, plan)
 }
 
-func planSecrets(baseDir string, secrets []SecretConfig) ([]plannedSecret, error) {
+func planSecrets(baseDir string, secrets []secretConfig) ([]plannedSecret, error) {
 	plan := make([]plannedSecret, 0, len(secrets))
 	planned := make(map[string]string, len(secrets))
 	for _, secret := range secrets {
@@ -54,14 +54,14 @@ func planSecrets(baseDir string, secrets []SecretConfig) ([]plannedSecret, error
 	return plan, nil
 }
 
-func materialize(client *SakuraClient, vaultID string, plan []plannedSecret) error {
+func materialize(client *sakuraClient, vaultID string, plan []plannedSecret) error {
 	for _, secret := range plan {
-		value, err := client.GetSecret(vaultID, secret.name)
+		value, err := client.getSecret(vaultID, secret.name)
 		if err != nil {
 			return fmt.Errorf("failed to get secret '%s': %w", secret.name, err)
 		}
 
-		if err := WriteSecretToFile(secret.dest, value); err != nil {
+		if err := writeSecretToFile(secret.dest, value); err != nil {
 			return fmt.Errorf("failed to write secret '%s' to %s: %w", secret.name, secret.dest, err)
 		}
 
