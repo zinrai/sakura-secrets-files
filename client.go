@@ -38,7 +38,7 @@ func NewClientFromEnv(zone string) (*SakuraClient, error) {
 func (c *SakuraClient) GetSecret(vaultID, secretName string) (string, error) {
 	op := secretmanager.NewSecretOp(c.api, vaultID)
 
-	req := v1.Unveil{
+	req := secretmanager.UnveilParams{
 		Name: secretName,
 	}
 
