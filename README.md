@@ -24,7 +24,7 @@ One line per file on stderr. Every secret in the manifest is fetched and written
 
 See [config.yaml.example](./config.yaml.example) for one to copy.
 
-`dest` is a path relative to `-base-dir`. An absolute path, a path that escapes `-base-dir`, and an unknown key anywhere in the manifest are all errors. The latest version of each secret is fetched.
+`dest` is a path relative to `-base-dir`. An absolute path, a path that escapes `-base-dir`, two secrets with the same `dest`, and an unknown key anywhere in the manifest are all errors. The latest version of each secret is fetched.
 
 ## Credentials
 

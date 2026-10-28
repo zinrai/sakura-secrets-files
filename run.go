@@ -23,13 +23,9 @@ func run(configPath, baseDir string) error {
 
 	// Up front, not inside the fetch loop: a manifest that would write outside
 	// base-dir must fail before a single secret leaves the vault
-	plan := make([]plannedSecret, 0, len(cfg.Secrets))
-	for _, secret := range cfg.Secrets {
-		dest, err := resolveDest(absBase, secret.Dest)
-		if err != nil {
-			return err
-		}
-		plan = append(plan, plannedSecret{name: secret.Name, dest: dest})
+	plan, err := planSecrets(absBase, cfg.Secrets)
+	if err != nil {
+		return err
 	}
 
 	client, err := NewClientFromEnv(cfg.Vault.Zone)
@@ -38,6 +34,24 @@ func run(configPath, baseDir string) error {
 	}
 
 	return materialize(client, cfg.Vault.ID, plan)
+}
+
+func planSecrets(baseDir string, secrets []SecretConfig) ([]plannedSecret, error) {
+	plan := make([]plannedSecret, 0, len(secrets))
+	planned := make(map[string]string, len(secrets))
+	for _, secret := range secrets {
+		dest, err := resolveDest(baseDir, secret.Dest)
+		if err != nil {
+			return nil, err
+		}
+		if other, ok := planned[dest]; ok {
+			return nil, fmt.Errorf("secrets '%s' and '%s' both write to %s", other, secret.Name, dest)
+		}
+		planned[dest] = secret.Name
+		plan = append(plan, plannedSecret{name: secret.Name, dest: dest})
+	}
+
+	return plan, nil
 }
 
 func materialize(client *SakuraClient, vaultID string, plan []plannedSecret) error {
