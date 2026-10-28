@@ -40,13 +40,6 @@ func WriteSecretToFile(dest, value string) error {
 	}
 	tmpFile = nil
 
-	// Before the rename, not after: dest must never be readable by anyone but
-	// the owner, not even for the moment between the two calls
-	if err := os.Chmod(tmpPath, 0600); err != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("failed to set permissions: %w", err)
-	}
-
 	if err := os.Rename(tmpPath, dest); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("failed to rename temp file: %w", err)
