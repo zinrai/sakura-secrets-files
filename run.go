@@ -21,7 +21,7 @@ func run(configPath, baseDir string) error {
 		return err
 	}
 
-	// Up front, not inside the fetch loop: a manifest that would write outside
+	// Up front, not inside the fetch loop: a config that would write outside
 	// base-dir must fail before a single secret leaves the vault
 	plan, err := planSecrets(absBase, cfg.Secrets)
 	if err != nil {

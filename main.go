@@ -9,7 +9,7 @@ import (
 func main() {
 	flag.Usage = printUsage
 
-	configPath := flag.String("config", "", "Path to the manifest (required)")
+	configPath := flag.String("config", "", "Path to the config file (required)")
 	baseDir := flag.String("base-dir", "", "Directory the dest paths are resolved against (required)")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 
@@ -44,7 +44,7 @@ func fail(err error) {
 func printUsage() {
 	fmt.Fprintf(os.Stderr, `Usage: sakura-secrets-files -config <path> -base-dir <dir>
 
-Writes the secrets declared in the manifest to their dest paths under base-dir.
+Writes the secrets declared in the config file to their dest paths under base-dir.
 The lifetime of the written files is the caller's responsibility.
 
 Options:

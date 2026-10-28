@@ -1,6 +1,6 @@
 # sakura-secrets-files
 
-A command-line tool that materializes secrets from [SAKURA Cloud Secret Manager](https://cloud.sakura.ad.jp/products/secrets-manager/) as files below a given directory, as declared in a YAML manifest.
+A command-line tool that materializes secrets from [SAKURA Cloud Secret Manager](https://cloud.sakura.ad.jp/products/secrets-manager/) as files below a given directory, as declared in a YAML config file.
 
 ## Usage
 
@@ -10,21 +10,21 @@ $ sakura-secrets-files -config secrets.yaml -base-dir /tmp/tmp.abc123
 [write] production-api-key -> /tmp/tmp.abc123/application/api_key
 ```
 
-One line per file on stderr. Every secret in the manifest is fetched and written on every run.
+One line per file on stderr. Every secret in the config file is fetched and written on every run.
 
 ### Options
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `-config <path>` | yes | Path to the manifest |
+| `-config <path>` | yes | Path to the config file |
 | `-base-dir <dir>` | yes | Directory the `dest` paths are resolved against. It must already exist |
 | `-version` | no | Print version and exit |
 
-## Manifest
+## Config
 
 See [config.yaml.example](./config.yaml.example) for one to copy.
 
-`dest` is a path relative to `-base-dir`. An absolute path, a path that escapes `-base-dir`, two secrets with the same `dest`, and an unknown key anywhere in the manifest are all errors. The latest version of each secret is fetched.
+`dest` is a path relative to `-base-dir`. An absolute path, a path that escapes `-base-dir`, two secrets with the same `dest`, and an unknown key anywhere in the config file are all errors. The latest version of each secret is fetched.
 
 ## Credentials
 
@@ -48,7 +48,7 @@ $ export SAKURA_PRIVATE_KEY_PATH="/path/to/private-key.pem"
 - Files with 0600 permissions, into missing intermediate directories created with 0700
 - Atomically, through a temporary file in the destination directory
 - Nothing outside `-base-dir`. The check is lexical, so it assumes `-base-dir` is a directory you control, and not one another user can plant symlinks in
-- Nothing at all until the manifest, every `dest` and `-base-dir` have been checked, so a bad manifest fails without a single secret leaving the vault
+- Nothing at all until the config file, every `dest` and `-base-dir` have been checked, so a bad config fails without a single secret leaving the vault
 
 ## When it fails
 
